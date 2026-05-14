@@ -50,7 +50,13 @@ CONFIG = {
     'MAX_REPAIR_RETRIES': 2,       # Maximum retries for repair functions
     'SUPPORTED_TOPICS': ['paper', 'survey', 'blog', 'textbook'],  # Supported content types
     'HUMAN_IN_LOOP': False,
-    'AUTO_OPEN_IMAGES': False
+    'AUTO_OPEN_IMAGES': False,
+
+    # Evaluation VLM settings (separate from generation for text-only gen models)
+    'EVALUATION_MODEL': None,
+    'EVALUATION_PROVIDER': None,
+    'EVALUATION_API_KEY': None,
+    'EVALUATION_BASE_URL': None,
 }
 
 
@@ -89,6 +95,12 @@ def update_config_from_sdk(sdk_config) -> None:
     # Always disable human-in-loop for SDK usage
     CONFIG['HUMAN_IN_LOOP'] = False
     CONFIG['AUTO_OPEN_IMAGES'] = False
+
+    # Evaluation VLM settings (can be separate from generation)
+    CONFIG['EVALUATION_MODEL'] = sdk_config.evaluation_model
+    CONFIG['EVALUATION_PROVIDER'] = sdk_config.evaluation_provider
+    CONFIG['EVALUATION_API_KEY'] = sdk_config.evaluation_api_key
+    CONFIG['EVALUATION_BASE_URL'] = sdk_config.evaluation_base_url
 
 def call_unified_llm(contents: List[Any], provider: Optional[str] = None,
                      api_key: Optional[str] = None, model: Optional[str] = None,
@@ -662,7 +674,13 @@ def generate_initial_code(paper_content: str, reference_figures: List[Image.Imag
                 ref_fig
             ])
 
-        response = call_google_genai_multimodal(multimodal_content)
+        response = call_unified_llm(
+            multimodal_content,
+            model=CONFIG.get('EVALUATION_MODEL'),
+            provider=CONFIG.get('EVALUATION_PROVIDER'),
+            api_key=CONFIG.get('EVALUATION_API_KEY'),
+            base_url=CONFIG.get('EVALUATION_BASE_URL'),
+        )
 
         if response is None:
             raise Exception("LLM returned an empty response")
@@ -1535,7 +1553,13 @@ You are a STRICT and CRITICAL figure evaluator. Your task is to rigorously evalu
                 ref_fig
             ])
 
-        response = call_google_genai_multimodal(multimodal_content)
+        response = call_unified_llm(
+            multimodal_content,
+            model=CONFIG.get('EVALUATION_MODEL'),
+            provider=CONFIG.get('EVALUATION_PROVIDER'),
+            api_key=CONFIG.get('EVALUATION_API_KEY'),
+            base_url=CONFIG.get('EVALUATION_BASE_URL'),
+        )
 
         if response is None:
             raise Exception("LLM returned an empty response")
@@ -1652,22 +1676,16 @@ Do NOT output any explanatory text or JSON.
         print(f"[Improvement Agent] Input code length: {len(code)}", flush=True)
         print(f"[Improvement Agent] LLM Provider: {CONFIG.get('LLM_PROVIDER')}", flush=True)
 
-        multimodal_content = [
+        # Use text-only content for improvement (deepseek-v4-pro is text-only)
+        # The code (SVG/XML) and critique are both text, no images needed
+        text_content = [
             improvement_prompt,
-            f"Previous iteration's figure (Iteration {iteration-1} - for reference):",
-            code_image,
-            f"Previous iteration's {format_name} code (Iteration {iteration-1} - to improve upon):",
+            f"Previous iteration's {format_name} code (to improve upon):",
             code
         ]
 
-        for i, ref_fig in enumerate(reference_figures):
-            multimodal_content.extend([
-                f"Reference figure example {i+1}:",
-                ref_fig
-            ])
-
-        print(f"[Improvement Agent] Calling LLM...", flush=True)
-        response = call_google_genai_multimodal(multimodal_content)
+        print(f"[Improvement Agent] Calling LLM (text-only mode)...", flush=True)
+        response = call_google_genai_multimodal(text_content)
         print(f"[Improvement Agent] LLM response length: {len(response) if response else 0}", flush=True)
 
         if response is None:

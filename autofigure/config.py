@@ -54,6 +54,12 @@ class Config:
     enhancement_count: int = 1  # Number of enhanced image variants to generate
     art_style: str = ""  # Art style for enhancement
 
+    # Evaluation VLM settings (defaults to generation settings)
+    evaluation_model: Optional[str] = None
+    evaluation_provider: Optional[str] = None
+    evaluation_api_key: Optional[str] = None
+    evaluation_base_url: Optional[str] = None
+
     # Pipeline settings
     max_iterations: int = 5
     quality_threshold: float = 9.0
@@ -92,6 +98,16 @@ class Config:
             self.enhancement_model = self._get_default_enhancement_model(self.enhancement_provider)
         if self.enhancement_base_url is None:
             self.enhancement_base_url = self._get_default_base_url(self.enhancement_provider)
+
+        # Default evaluation settings to generation settings
+        if self.evaluation_api_key is None:
+            self.evaluation_api_key = self.generation_api_key
+        if self.evaluation_provider is None:
+            self.evaluation_provider = self.generation_provider
+        if self.evaluation_model is None:
+            self.evaluation_model = self.generation_model
+        if self.evaluation_base_url is None:
+            self.evaluation_base_url = self.generation_base_url
 
     def _get_default_base_url(self, provider: str) -> str:
         """Get default base URL for a provider."""
@@ -189,6 +205,10 @@ class Config:
             enhancement_base_url=os.environ.get("AUTOFIGURE_ENHANCEMENT_BASE_URL"),
             enhancement_input_type=os.environ.get("AUTOFIGURE_ENHANCEMENT_INPUT_TYPE", "code2prompt"),
             art_style=os.environ.get("AUTOFIGURE_ART_STYLE", ""),
+            evaluation_model=os.environ.get("AUTOFIGURE_EVALUATION_MODEL"),
+            evaluation_provider=os.environ.get("AUTOFIGURE_EVALUATION_PROVIDER"),
+            evaluation_api_key=os.environ.get("AUTOFIGURE_EVALUATION_API_KEY"),
+            evaluation_base_url=os.environ.get("AUTOFIGURE_EVALUATION_BASE_URL"),
             max_iterations=int(os.environ.get("AUTOFIGURE_MAX_ITERATIONS", "5")),
             quality_threshold=float(os.environ.get("AUTOFIGURE_QUALITY_THRESHOLD", "9.0")),
             output_dir=os.environ.get("AUTOFIGURE_OUTPUT_DIR", "./autofigure_output"),
